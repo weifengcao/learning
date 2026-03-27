@@ -7,6 +7,8 @@ This repo is for building two parallel foundations:
 
 The structure is intentionally split between applied enterprise AI work and deeper technical foundations. The goal is not only to learn how to use LLMs and agents, but also to understand the systems, controls, and engineering discipline required to ship reliable products.
 
+The main study roadmap for this repo is in [LEARNING_PLAN.md](/Users/weifengcao/Documents/learning/LEARNING_PLAN.md).
+
 ## Folder map
 
 - `enterprise_ai_app/`: how to build enterprise AI applications that are controllable, observable, secure, and cost-bounded
