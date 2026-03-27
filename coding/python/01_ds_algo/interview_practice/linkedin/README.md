@@ -11,6 +11,7 @@ Saved artifacts:
 
 - `EXTRACTED_QUESTIONS.md`: deduplicated metadata from the public PracHub listing
 - `PYTHON_PRACTICE_BACKLOG.md`: coding-focused subset we can practice in Python here
+- `workbook.py`: clean paraphrased prompts with Python starter code
 
 ## Common emphasis areas
 
