@@ -7,6 +7,11 @@ Important note:
 
 This is a pattern-focused practice set, not a claim about exact current LinkedIn interview questions.
 
+Saved artifacts:
+
+- `EXTRACTED_QUESTIONS.md`: deduplicated metadata from the public PracHub listing
+- `PYTHON_PRACTICE_BACKLOG.md`: coding-focused subset we can practice in Python here
+
 ## Common emphasis areas
 
 - graph traversal and dependency relationships
