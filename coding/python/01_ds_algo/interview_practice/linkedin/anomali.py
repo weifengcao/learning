@@ -53,7 +53,8 @@ agg.get_top_k_hosts(2)   # ["c", "a"]
 """
 from collections import defaultdict, deque
 import heapq
-from platform import node
+from threading import Lock
+
 
 class AlertAggregator:
     def __init__(self, window_size: int):
@@ -61,6 +62,7 @@ class AlertAggregator:
         self.alerts = deque()
         self.scores = defaultdict(int)
         self.latest_timestamp = 0
+        self.lock = Lock()  # for thread safety
     
     def _cleanup(self, timestamp: int) -> None:
         expiry_time = timestamp - self.window_size
@@ -78,13 +80,14 @@ class AlertAggregator:
         2. update scores for the host
         3. clean up alerts and scores for evicted alerts
         """
-        self.latest_timestamp = max(self.latest_timestamp, alert["timestamp"])
-        host, sev = alert["host"], alert["severity"]
-        self.alerts.append((alert["timestamp"], host, sev))
-        self.scores[host] += sev
+        with self.lock:     
+            self.latest_timestamp = max(self.latest_timestamp, alert["timestamp"])
+            host, sev = alert["host"], alert["severity"]
+            self.alerts.append((alert["timestamp"], host, sev))
+            self.scores[host] += sev
 
-        # we need to evict old alerts
-        self._cleanup(self.latest_timestamp)
+            # we need to evict old alerts
+            self._cleanup(self.latest_timestamp)
 
     def get_top_k_hosts(self, k: int) -> list[str]: 
         # heap for all hosts and then read the top k
@@ -97,12 +100,13 @@ class AlertAggregator:
                 if self.score == other.score:
                     return self.host < other.host
                 return self.score > other.score # max heap 
-            
-        heap = []
-        # scan all score items
-        for host, score in self.scores.items(): 
+        with self.lock:
+            heap = []
+            # scan all score items
+
+            for host, score in self.scores.items(): 
                 # build item
-                item = HeapItem(host,score)
+                item = HeapItem(host, score)
                 # we only keep k items in the heap
                 if len(heap) < k:
                     heapq.heappush(heap, item)
@@ -111,12 +115,12 @@ class AlertAggregator:
                     if item > heap[0]:
                         heapq.heapreplace(heap, item)
 
-        # extract hosts from the heap
-        result = []
-        while heap:
-            result.append(heapq.heappop(heap).host)
+            # extract hosts from the heap
+            result = []
+            while heap:
+                result.append(heapq.heappop(heap).host)
 
-        return result
+            return result
 
 agg = AlertAggregator(window_size=10)
 
@@ -475,8 +479,6 @@ print(lru.get(3))  # -1 (not found)
 print(lru.get(4))  # 4      
 
 """
-
-
 5. Given a list of intervals:
 
 intervals = [[1, 3], [2, 6], [8, 10], [15, 18]]
@@ -492,7 +494,6 @@ keep a result list
 compare current interval to the last merged interval
 if overlapping, extend the end
 otherwise append a new interval
-
 
 """
 class MergeIntervals:
@@ -521,3 +522,165 @@ intervals = [[1, 3], [2, 6], [8, 10], [15, 18]]
 
 merger = MergeIntervals()
 print(merger.merge(intervals))  # [[1, 6], [8, 10], [15, 18]]
+
+# What if intervals arrive as a stream? 
+"""
+7. Trie: Store a million domain names and efficiently check if a new URL belongs to a blocked domain
+"""
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_blocked = False 
+
+class DomainBlocker:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def add_blocked_domain(self, domain: str) -> None:
+        node = self.root
+        for part in domain.split('.')[::-1]:  # reverse for suffix trie
+            if part not in node.children:
+                node.children[part] = TrieNode()
+            node = node.children[part]
+        node.is_blocked = True
+
+    def is_blocked(self, url: str) -> bool:
+        node = self.root
+        for part in url.split('.')[::-1]:
+            if part in node.children:
+                node = node.children[part]
+                if node.is_blocked:
+                    return True
+            else:
+                break
+        return False
+    
+"""
+BFS or DFS to find all paths from source to destination in a directed graph.
+
+"""
+def find_all_paths(graph: dict[str, list[str]], source: str, destination: str) -> list[list[str]]:
+    # edge case
+    if source not in graph or destination not in graph:
+        return source if source == destination else []
+    result = []
+
+    """
+    DFS to find all paths, so we need to backtrack the path and visited set after exploring each path
+    the visited set is to avoid cycles, we can also use path list to check if we have visited a node, but it is more expensive to check in the list than in the set 
+
+    """
+    def dfs(node: str, current_path: list[str], visited: set[str]) -> Node:
+        # we should include the current node in the path and mark it as visited
+        # otherwise, we lost the last node
+        # for current node
+        current_path.append(node)
+        visited.add(node)
+
+        # base
+        if node == destination:
+            result.append(list(current_path))
+        else: 
+        
+            # recursive for all neighbors
+            for neighbor in graph.get(node, []):
+                if neighbor not in visited:
+                    dfs(neighbor, current_path, visited)
+        
+        # backtrack the current back to its parents for other paths
+        current_path.pop()
+        visited.remove(node)
+        
+    dfs(source, [], set())
+        
+    return result
+
+graph = {
+    "A": ["B", "C"],
+    "B": ["D"],
+    "C": ["D"],
+    "D": []
+}           
+
+print(find_all_paths(graph, "A", "D"))  # [["A", "B", "D"], ["A", "C", "D"]]
+    
+"""
+find the shortest path from source to destination in a directed graph, return the path and the distance
+lets do two excercises, one is unweighted graph, we can use BFS, the other is weighted graph, we can use Dijkstra's algorithm
+"""
+from collections import deque
+# BFS for unweighted graph
+def find_shortest_path_unweighted(graph: dict[str, list[str]], source: str, destination: str) -> tuple[list[str], int]:                                
+    # edge case
+    if source not in graph or destination not in graph:
+        return (source, 0) if source == destination else ([], -1)
+    
+    queue = deque([(source, [source], 0)]) # list of tuples, each item is a tuple, and stored in a list
+    visited = set()
+    visited.add(source)
+
+    while queue:
+        node, path, dist = queue.popleft()
+
+        if node == destination:
+            return (path, dist)
+        
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append((neighbor, path + [neighbor], dist + 1))
+
+    return ([], -1)  # no path found
+
+print(find_shortest_path_unweighted(graph, "A", "D")) 
+
+# Dijsktra's algorithm for weighted graph
+
+import heapq
+
+def find_shortest_path(graph: dict[str, list[tuple[str, int]]], source: str, destination: str) -> tuple[list[str], int]:                                
+    if source == destination:
+        return ([source], 0)
+    if source not in graph or destination not in graph:
+        return ([], float('inf'))
+
+    # Start with an EMPTY visited set. 
+    # Do NOT add source to visited here.
+    min_heap = [(0, source, [source])]
+    visited = set()
+
+    print(f"--- Starting Search from {source} to {destination} ---")
+
+    while min_heap:
+        dist, node, path = heapq.heappop(min_heap)
+        print(f"Popped from heap: Node={node}, Current_Dist={dist}, Path={path}")
+        # Skip nodes we have already finalized
+        if node in visited:
+            continue
+            
+        # Finalize node ONLY on pop
+        visited.add(node)
+        
+        
+        if node == destination:
+            
+            return (path, dist)
+        
+        for neighbor, weight in graph.get(node, []):
+            if neighbor not in visited:
+                heapq.heappush(min_heap, (dist + weight, neighbor, path + [neighbor]))
+
+    return ([], float('inf'))
+
+# unit test
+weighted_graph = {
+    "A": [("B", 1), ("C", 4)],
+    "B": [("D", 2)],
+    "C": [("D", 1)],
+    "D": []
+}
+
+print(find_shortest_path(weighted_graph, "A", "D"))  # (["A", "B", "D"], 3)
+
+
