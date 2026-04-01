@@ -662,9 +662,7 @@ def find_shortest_path(graph: dict[str, list[tuple[str, int]]], source: str, des
         # Finalize node ONLY on pop
         visited.add(node)
         
-        
         if node == destination:
-            
             return (path, dist)
         
         for neighbor, weight in graph.get(node, []):
